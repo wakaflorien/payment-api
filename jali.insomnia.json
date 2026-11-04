@@ -1,0 +1,395 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-11-04T12:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v10.0.0",
+  "resources": [
+    {
+      "_id": "wrk_jali_practice",
+      "_type": "workspace",
+      "parentId": null,
+      "name": "Jali loan API (practice)",
+      "description": "Pick an environment (Admin / Loan officer / Auditor), send Auth \u2192 Login, then any request. Switch environment and log in again to see the 403s.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_wrk_jali_practice_base",
+      "_type": "environment",
+      "parentId": "wrk_jali_practice",
+      "name": "Base Environment",
+      "data": {
+        "baseUrl": "http://localhost:3000/api",
+        "token": "{% response 'body', 'req_jp_login', 'b64::JC5hY2Nlc3NUb2tlbg==::46b', 'never', 60 %}",
+        "customerId": "{% response 'body', 'req_jp_customer_create', 'b64::JC5pZA==::46b', 'never', 60 %}",
+        "loanId": "{% response 'body', 'req_jp_loan_create', 'b64::JC5pZA==::46b', 'never', 60 %}",
+        "userId": "{% response 'body', 'req_jp_user_create', 'b64::JC5pZA==::46b', 'never', 60 %}"
+      },
+      "dataPropertyOrder": null,
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 0
+    },
+    {
+      "_id": "env_wrk_jali_practice_0",
+      "_type": "environment",
+      "parentId": "env_wrk_jali_practice_base",
+      "name": "Admin",
+      "data": {
+        "email": "admin@jali.rw",
+        "password": "secret-pass"
+      },
+      "dataPropertyOrder": null,
+      "color": "#e5484d",
+      "isPrivate": false,
+      "metaSortKey": 0
+    },
+    {
+      "_id": "env_wrk_jali_practice_1",
+      "_type": "environment",
+      "parentId": "env_wrk_jali_practice_base",
+      "name": "Loan officer",
+      "data": {
+        "email": "officer@jali.rw",
+        "password": "secret-pass"
+      },
+      "dataPropertyOrder": null,
+      "color": "#3e63dd",
+      "isPrivate": false,
+      "metaSortKey": 1
+    },
+    {
+      "_id": "env_wrk_jali_practice_2",
+      "_type": "environment",
+      "parentId": "env_wrk_jali_practice_base",
+      "name": "Auditor",
+      "data": {
+        "email": "auditor@jali.rw",
+        "password": "secret-pass"
+      },
+      "dataPropertyOrder": null,
+      "color": "#30a46c",
+      "isPrivate": false,
+      "metaSortKey": 2
+    },
+    {
+      "_id": "fld_wrk_jali_practice_0",
+      "_type": "request_group",
+      "parentId": "wrk_jali_practice",
+      "name": "Auth",
+      "description": "",
+      "environment": {},
+      "metaSortKey": 0
+    },
+    {
+      "_id": "req_jp_login",
+      "_type": "request",
+      "parentId": "fld_wrk_jali_practice_0",
+      "name": "Login (as the active environment's role)",
+      "description": "Send this after switching environment. Every other request reuses its accessToken.",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/auth/login",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.email }}\",\n  \"password\": \"{{ _.password }}\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "metaSortKey": 0,
+      "settingEncodeUrl": true,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_jp_me",
+      "_type": "request",
+      "parentId": "fld_wrk_jali_practice_0",
+      "name": "Me (who am I, which role)",
+      "description": "",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/auth/me",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}",
+        "prefix": ""
+      },
+      "metaSortKey": 1,
+      "settingEncodeUrl": true,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "fld_wrk_jali_practice_1",
+      "_type": "request_group",
+      "parentId": "wrk_jali_practice",
+      "name": "Customers (write: admin, officer \u00b7 read: all)",
+      "description": "",
+      "environment": {},
+      "metaSortKey": 1
+    },
+    {
+      "_id": "req_jp_customer_create",
+      "_type": "request",
+      "parentId": "fld_wrk_jali_practice_1",
+      "name": "Create customer",
+      "description": "Phone and national ID must be unique: change them to create another customer.",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/customers",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"fullName\": \"Aline Uwase\",\n  \"phone\": \"0788123456\",\n  \"nationalId\": \"1199080012345678\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}",
+        "prefix": ""
+      },
+      "metaSortKey": 0,
+      "settingEncodeUrl": true,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_jp_customer_list",
+      "_type": "request",
+      "parentId": "fld_wrk_jali_practice_1",
+      "name": "List customers",
+      "description": "",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/customers?page=1",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}",
+        "prefix": ""
+      },
+      "metaSortKey": 1,
+      "settingEncodeUrl": true,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "fld_wrk_jali_practice_2",
+      "_type": "request_group",
+      "parentId": "wrk_jali_practice",
+      "name": "Loans (write: admin, officer \u00b7 read: all)",
+      "description": "",
+      "environment": {},
+      "metaSortKey": 2
+    },
+    {
+      "_id": "req_jp_loan_create",
+      "_type": "request",
+      "parentId": "fld_wrk_jali_practice_2",
+      "name": "Disburse loan (uses last created customer)",
+      "description": "",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/loans",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"customerId\": {{ _.customerId }},\n  \"principal\": 100000,\n  \"interestRate\": 10,\n  \"termMonths\": 3\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}",
+        "prefix": ""
+      },
+      "metaSortKey": 0,
+      "settingEncodeUrl": true,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_jp_loan_show",
+      "_type": "request",
+      "parentId": "fld_wrk_jali_practice_2",
+      "name": "Show loan (last disbursed)",
+      "description": "",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/loans/{{ _.loanId }}",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}",
+        "prefix": ""
+      },
+      "metaSortKey": 1,
+      "settingEncodeUrl": true,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_jp_repay",
+      "_type": "request",
+      "parentId": "fld_wrk_jali_practice_2",
+      "name": "Record repayment (unique ref each send)",
+      "description": "",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/loans/{{ _.loanId }}/repayments",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"amount\": 20000,\n  \"providerRef\": \"MOMO-{% now 'millis', '' %}\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}",
+        "prefix": ""
+      },
+      "metaSortKey": 2,
+      "settingEncodeUrl": true,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "fld_wrk_jali_practice_3",
+      "_type": "request_group",
+      "parentId": "wrk_jali_practice",
+      "name": "Reports (admin, auditor)",
+      "description": "",
+      "environment": {},
+      "metaSortKey": 3
+    },
+    {
+      "_id": "req_jp_portfolio",
+      "_type": "request",
+      "parentId": "fld_wrk_jali_practice_3",
+      "name": "Portfolio report",
+      "description": "",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/reports/portfolio",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}",
+        "prefix": ""
+      },
+      "metaSortKey": 0,
+      "settingEncodeUrl": true,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "fld_wrk_jali_practice_4",
+      "_type": "request_group",
+      "parentId": "wrk_jali_practice",
+      "name": "Users (admin only)",
+      "description": "",
+      "environment": {},
+      "metaSortKey": 4
+    },
+    {
+      "_id": "req_jp_user_list",
+      "_type": "request",
+      "parentId": "fld_wrk_jali_practice_4",
+      "name": "List staff",
+      "description": "",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/users",
+      "body": {},
+      "headers": [],
+      "parameters": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}",
+        "prefix": ""
+      },
+      "metaSortKey": 0,
+      "settingEncodeUrl": true,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_jp_user_create",
+      "_type": "request",
+      "parentId": "fld_wrk_jali_practice_4",
+      "name": "Create staff user",
+      "description": "",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/users",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"staff{% now 'millis', '' %}@jali.rw\",\n  \"password\": \"secret-pass\",\n  \"role\": \"loan_officer\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}",
+        "prefix": ""
+      },
+      "metaSortKey": 1,
+      "settingEncodeUrl": true,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    },
+    {
+      "_id": "req_jp_user_update",
+      "_type": "request",
+      "parentId": "fld_wrk_jali_practice_4",
+      "name": "Change role / block (last created user)",
+      "description": "",
+      "method": "PATCH",
+      "url": "{{ _.baseUrl }}/users/{{ _.userId }}",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"role\": \"auditor\",\n  \"isActive\": true\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "parameters": [],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}",
+        "prefix": ""
+      },
+      "metaSortKey": 2,
+      "settingEncodeUrl": true,
+      "settingSendCookies": true,
+      "settingStoreCookies": true
+    }
+  ]
+}

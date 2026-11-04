@@ -1,0 +1,11 @@
+node_modules
+dist
+.docker
+coverage
+*.tsbuildinfo
+
+# Local secrets and database dumps: never commit these.
+secrets/
+backups/
+!.env.example
+config.bat

@@ -1,0 +1,131 @@
+# Production-like stack: MySQL + one-off migrations + the API.
+#
+#   scripts/generate-secrets.sh                                  # once: random secrets in ./secrets
+#   docker compose -f docker-compose.prod.yml up -d --build      # db -> migrate -> api
+#   docker compose -f docker-compose.prod.yml --profile ops run --rm backup   # on demand (cron it in real life)
+#
+# (For development use docker-compose.dev.yml instead: `pnpm docker:dev`.)
+#
+# Secrets are mounted as files under /run/secrets and read through *_FILE variables,
+# so they never appear in `docker inspect`, the image, or the environment.
+
+name: jali-prod
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: jali
+      MYSQL_USER: jali_migrator
+      MYSQL_PASSWORD_FILE: /run/secrets/db_migrator_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+    command:
+      - --default-time-zone=+00:00
+      # Binary logs enable point-in-time recovery on top of the nightly dumps.
+      - --binlog-expire-logs-seconds=604800
+    secrets: [db_root_password, db_migrator_password, db_app_password]
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 --silent']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # No published port: only the API and the ops jobs on this network can reach it.
+
+  # Applies pending migrations once, as the schema owner, then exits.
+  # Running them here (not on every API boot) means several API replicas never race on DDL.
+  migrate:
+    build: { context: ., target: runtime }
+    command: ['node', 'node_modules/typeorm/cli.js', 'migration:run', '-d', 'dist/database/data-source.js']
+    environment:
+      DB_HOST: db
+      DB_PORT: '3306'
+      DB_DATABASE: jali
+      DB_USERNAME: jali_migrator
+      DB_PASSWORD_FILE: /run/secrets/db_migrator_password
+    secrets: [db_migrator_password]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    build: { context: ., target: runtime }
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      LOG_FORMAT: json
+      LOG_LEVEL: log
+      DB_HOST: db
+      DB_PORT: '3306'
+      DB_DATABASE: jali
+      DB_USERNAME: jali_app
+      DB_PASSWORD_FILE: /run/secrets/db_app_password
+      DB_SYNCHRONIZE: 'false'
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      MTN_CALLBACK_TOKEN_FILE: /run/secrets/mtn_callback_token
+      MTN_CALLBACK_SECRET_FILE: /run/secrets/mtn_callback_secret
+      AIRTEL_CALLBACK_TOKEN_FILE: /run/secrets/airtel_callback_token
+      AIRTEL_CALLBACK_SECRET_FILE: /run/secrets/airtel_callback_secret
+      # Local demo: simulated providers. Real deployments use "http" plus MTN_*/AIRTEL_* API keys.
+      PAYMENT_PROVIDER_MODE: ${PAYMENT_PROVIDER_MODE:-simulator}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+    secrets:
+      - db_app_password
+      - jwt_secret
+      - mtn_callback_token
+      - mtn_callback_secret
+      - airtel_callback_token
+      - airtel_callback_secret
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # Hardening: nothing to write to, no extra Linux capabilities, no privilege escalation.
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    deploy:
+      resources:
+        limits: { cpus: '1', memory: 512M }
+
+  # docker compose --profile ops run --rm backup
+  backup:
+    profiles: [ops]
+    image: mysql:8.4
+    entrypoint: ['bash', '/scripts/db-backup.sh']
+    working_dir: /work
+    environment:
+      DB_HOST: db
+      DB_DATABASE: jali
+      DB_USERNAME: jali_migrator
+      DB_PASSWORD_FILE: /run/secrets/db_migrator_password
+      BACKUP_DIR: /backups
+      RETENTION_DAYS: '14'
+    secrets: [db_migrator_password]
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
+
+secrets:
+  db_root_password: { file: ./secrets/db_root_password.txt }
+  db_migrator_password: { file: ./secrets/db_migrator_password.txt }
+  db_app_password: { file: ./secrets/db_app_password.txt }
+  jwt_secret: { file: ./secrets/jwt_secret.txt }
+  mtn_callback_token: { file: ./secrets/mtn_callback_token.txt }
+  mtn_callback_secret: { file: ./secrets/mtn_callback_secret.txt }
+  airtel_callback_token: { file: ./secrets/airtel_callback_token.txt }
+  airtel_callback_secret: { file: ./secrets/airtel_callback_secret.txt }

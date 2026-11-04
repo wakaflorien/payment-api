@@ -1,0 +1,83 @@
+# Docker for development. The native way (pnpm start:dev against your own MySQL) keeps working,
+# and both read the same .env, so you can switch between them at any time.
+#
+#   pnpm docker:dev       API with hot reload + MySQL, all in Docker (nothing to install but Docker)
+#   pnpm docker:dev:down  stop it (data is kept; `pnpm docker:reset` wipes it)
+#   docker compose -f docker-compose.dev.yml up -d db   only MySQL; run the API natively with `pnpm start:dev`
+#
+# MySQL is published on host port ${DOCKER_DB_PORT:-3307}, not 3306, so it never collides with a
+# MySQL you already run natively. To use the Docker database from a native app or test run:
+#   DB_PORT=3307 pnpm start:dev        DB_PORT=3307 pnpm test:e2e
+# (or set DB_PORT=3307 in .env; or stop your native MySQL and set DOCKER_DB_PORT=3306).
+# The API is published on ${API_PORT:-3000}: stop a native `pnpm start:dev` first, or change API_PORT.
+
+name: jali-dev
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${DOCKER_DB_PORT:-3307}:3306'
+    environment:
+      # Same local credentials as .env.example, so the same .env works in Docker and natively.
+      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+      MYSQL_DATABASE: jali
+      MYSQL_USER: jali
+      MYSQL_PASSWORD: jali_secret
+    command: ['--default-time-zone=+00:00']
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docker/mysql/init-dev:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -ujali -pjali_secret --silent']
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  # Started by `pnpm docker:dev` (profile "app"), not by `up -d db`.
+  api:
+    profiles: [app]
+    build:
+      context: .
+      target: dev
+    ports:
+      - '${API_PORT:-3000}:3000'
+      - '127.0.0.1:9229:9229' # debugger: attach to localhost:9229
+    # Your .env first, so settings such as provider sandbox keys apply here too ...
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # ... then the only differences from running natively: where the database is.
+      DB_HOST: db
+      DB_PORT: '3306'
+      DB_USERNAME: jali
+      DB_PASSWORD: jali_secret
+      DB_DATABASE: jali
+      DB_SYNCHRONIZE: 'true'
+      NODE_ENV: development
+      # Fixed inside the container; the host side is API_PORT (ignores PORT from .env).
+      PORT: '3000'
+    # tsc --watch + node --watch; also keeps node_modules in step with package.json.
+    command: ['sh', 'docker/dev-start.sh']
+    volumes:
+      - .:/app
+      # Linux-built node_modules and the container's compiled output (.docker/dist) stay inside Docker: bcrypt is a native module, so
+      # the macOS/Windows binaries in your host node_modules would not load in the container.
+      - node-modules:/app/node_modules
+      - docker-build:/app/.docker
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+
+volumes:
+  db-data:
+  node-modules:
+  docker-build:

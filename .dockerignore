@@ -1,0 +1,16 @@
+# Keep the build context small and never send secrets or local data to the daemon.
+.git
+node_modules
+dist
+.docker
+coverage
+backups
+secrets
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+test
+docs
+*.md
+jali.insomnia.json

@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    // Compile into the container-only volume mounted at /app/.docker, never into the host's
+    // dist/ (a mount point can't be deleted by `nest build`, and a native run would clash).
+    "outDir": "./.docker/dist",
+    // The host's tsconfig.build.tsbuildinfo describes the host's dist/; reusing that cache
+    // here would make tsc skip emitting files.
+    "incremental": false
+  }
+}
